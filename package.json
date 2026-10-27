@@ -1,6 +1,6 @@
 {
   "name": "@bergaaberg/peak",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "peak.yaml: one small file per repo that tells people and coding agents what the repo is, what owns what, and what to read first.",
   "license": "MIT",
   "repository": {

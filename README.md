@@ -30,8 +30,8 @@ Read by [Dovre](https://github.com/bergaaberg/dovre)'s Topo (once called Atlas),
 ## Check a repo
 
 ```sh
-npx github:bergaaberg/peak#v0.1.0 check          # this folder
-npx github:bergaaberg/peak#v0.1.0 check a/ b/    # several repos
+npx github:bergaaberg/peak#v0.2.0 check          # this folder
+npx github:bergaaberg/peak#v0.2.0 check a/ b/    # several repos
 ```
 
 It checks the format and that every `docs` path and `rules` file exists. Exit code 1 on any
@@ -41,13 +41,13 @@ In GitHub Actions:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: bergaaberg/peak@v0.1.0
+- uses: bergaaberg/peak@v0.2.0
 ```
 
 ## Use the parser
 
 ```sh
-pnpm add github:bergaaberg/peak#v0.1.0
+pnpm add github:bergaaberg/peak#v0.2.0
 ```
 
 ```ts
