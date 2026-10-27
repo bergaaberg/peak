@@ -1,8 +1,9 @@
 # peak.yaml, version 1
 
 `peak.yaml` is one small file at the root of a repo. It says what the repo is, how much care it
-gets, which part owns which files, and what to read before touching anything. People read it,
-and so do coding agents and dashboards.
+gets, which part owns which files, and what to read before touching anything. It can also say
+what the repo deploys, what it depends on and who answers for it, so a set of repos reads as a
+small service catalog. People read it, and so do coding agents and dashboards.
 
 Why a separate file: a coding agent that starts work in an unfamiliar repo needs the boundaries
 and the rules before its first edit. README.md is written for users, AGENTS.md / CLAUDE.md for
@@ -33,13 +34,90 @@ For editor completion and checks, start the file with:
 | `description` | no | text | One sentence on what it is. |
 | `url` | no | http(s) URL | Where it runs or is published. |
 | `tier` | no | word | How much care the repo gets. Default `active`. See [Tiers](#tiers). |
-| `components` | no | list | The parts of the repo. Each has `name` (required), `owns` (required: a non-empty list of paths or globs relative to the root) and `rules` (optional: a repo-relative file with that part's rules). |
+| `owner` | no | handle | Who answers for the repo: a forge handle, `@user` or `@org/team`. |
+| `provider` | no | word | Where the `runs` entries run unless an entry says otherwise, e.g. `cloudflare`. Tools may assume one when it's left out. |
+| `components` | no | list | The parts of the repo. Each has `name` (required), `owns` (required: a non-empty list of paths or globs relative to the root), `rules` (optional: a repo-relative file with that part's rules) and `owner` (optional: as above, when not the repo's). |
 | `docs` | no | mapping | What to read first, as `label: path` (e.g. `architecture: ARCHITECTURE.md`). Labels are free text. |
-| `health` | no | mapping | What a dashboard should watch: `workers` (names of deployed services, e.g. Cloudflare Workers) and `links` (http(s) URLs that should answer). |
+| `runs` | no | mapping | What the repo deploys, in production. See [What it runs](#what-it-runs). |
+| `uses` | no | list | What it depends on: other repos' peaks and outside services. See [What it uses](#what-it-uses). |
+| `environments` | no | mapping | Environments other than production, with only what differs. See [Environments](#environments). |
+| `health` | no | mapping | What a dashboard should watch beyond `runs`: `links` (http(s) URLs that should answer) and `workers` (read as production workers too; new files name them under `runs`). |
 
 Paths are relative to the repo root. `owns` entries are written the way people write them in
 CODEOWNERS or .gitignore (`src/web/`, `packages/db/**`); tools treat a trailing `/` as "this
 folder and everything in it".
+
+### What it runs
+
+`runs` names what the repo deploys, by kind, by the names the provider knows them by:
+
+| Kind | What |
+| --- | --- |
+| `workers` | Deployed services (Cloudflare Workers, functions, containers). |
+| `databases` | Databases (D1, Postgres, …). |
+| `stores` | Key-value stores (KV namespaces, …). |
+| `buckets` | Object storage (R2, S3, …). |
+| `queues` | Message queues. |
+
+Each entry is a name, or a mapping with `name` and any of:
+
+- `provider`: where this one runs, when not the file's `provider`.
+- `component`: the component it belongs to (one of `components`), tying code to what runs it.
+- `hosts` (workers only): for a worker that only serves static files and so never runs code of
+  its own, the hostnames it serves. A dashboard counts their traffic as its.
+- `objects` (workers only): the Durable Object classes it holds. They live inside the worker, so
+  they're named on it rather than as a kind of their own.
+
+A name ending in `*` is a pattern: it stands for every one with that prefix **not named before
+it in the same list**. Order matters, so name the specific ones first:
+
+```yaml
+runs:
+  workers: [skribb-web, skribb-cms-*, skribb-*]   # skribb-web alone, then the CMS tenants, then the rest
+```
+
+A `*` anywhere but the end is a problem. Unknown kinds are warnings.
+
+### What it uses
+
+`uses` lists what the repo depends on. Each entry is one of:
+
+- `owner/name`: another repo, whose own peak.yaml says what it is.
+- a lowercase word: an outside service (`stripe`, `resend`, `anthropic`). Words aren't checked
+  against a list; write the service's usual name.
+- a mapping with `repo` (and optionally `what`: which of that repo's `runs` entries, when not all
+  of it) or with `service`, and optionally `why`.
+
+```yaml
+uses:
+  - bergaaberg/dovre-control
+  - repo: bergaaberg/skribb
+    what: skribb-cms-*
+    why: reads tenants' posts
+  - service: stripe
+    why: payments
+```
+
+### Environments
+
+`url` and `runs` describe production. `environments` names the others (`staging`, `preview`, …)
+with only what differs: its own `url`, and a `runs` whose kinds **replace** production's list of
+that kind. A kind it doesn't name is shared with production. `production` is the file itself, so
+it can't be named here.
+
+```yaml
+url: https://skribb.no
+runs:
+  workers: [skribb-web]
+  databases: [skribb]
+environments:
+  staging:
+    url: https://staging.skribb.no
+    runs:
+      workers: [skribb-web-staging]   # databases: shared with production
+```
+
+The parser's `runsIn(peak, env)` gives what one environment runs, with this applied.
 
 ### Tiers
 
@@ -57,7 +135,8 @@ a word treat it like `active`.
 A file that breaks a rule above has **problems**, and a tool should not use it (Dovre lists it on
 /topo with the problems; `peak check` fails). Every problem is reported, not just the first.
 
-Unknown keys, and `docs` entries that aren't paths, are **warnings**: the file is still used and
+Unknown keys, unknown `runs` kinds, `hosts` or `objects` on anything but a worker, and `docs` entries that
+aren't paths, are **warnings**: the file is still used and
 the extra keys are ignored. That leaves room for tools to experiment, but a key that matters
 should come here first.
 
@@ -114,7 +193,8 @@ More in [examples/](examples/).
   describes the repo from the inside (which folder is which part), and is read straight from the
   checkout. `tier` is close to Backstage's `lifecycle`; `components` are folders, not services.
 - **CODEOWNERS** maps paths to reviewers. `owns` maps paths to *parts of the system*, and a part
-  points at its rules, not at people. A repo can have both.
+  points at its rules. `owner` names who answers for the repo or a part, not who reviews each
+  file. A repo can have both.
 - **AGENTS.md / CLAUDE.md** hold the rules in prose. peak.yaml doesn't repeat them: it points at
   them (`docs`, a component's `rules`), so a tool knows which rules apply to which files.
 
@@ -129,4 +209,8 @@ More in [examples/](examples/).
 ## Changes
 
 Version 1 is the first published version, the same shape as Dovre's `range.yaml` plus `version`.
+
+Still version 1, every new field optional: `owner`, `provider`, `runs`, `uses`,
+`environments`, and a component's `owner`. `health.workers` keeps its meaning and is read as
+production workers alongside `runs.workers`. Older parsers warn on the new keys and use the rest.
 A change that would make an existing valid file mean something else gets a new version number.

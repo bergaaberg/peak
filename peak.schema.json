@@ -4,51 +4,414 @@
   "title": "peak.yaml",
   "description": "What a repo is, what owns what, and what to read first, for people and coding agents. Spec: https://github.com/bergaaberg/peak/blob/main/SPEC.md",
   "type": "object",
-  "required": ["name"],
+  "required": [
+    "name"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "version": { "description": "The format version. Leave it out or write 1.", "const": 1 },
-    "name": { "description": "The project's name, as people say it.", "type": "string", "minLength": 1 },
-    "description": { "description": "One sentence on what it is.", "type": "string" },
-    "url": { "description": "Where it runs or is published.", "type": "string", "format": "uri", "pattern": "^https?://" },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "description": "The format version. Leave it out or write 1.",
+      "const": 1
+    },
+    "name": {
+      "description": "The project's name, as people say it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "description": "One sentence on what it is.",
+      "type": "string"
+    },
+    "url": {
+      "description": "Where it runs or is published.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
     "tier": {
       "description": "How much care the repo gets. active: worked on now, changes go through review and CI. maintained: kept working, changes are small and careful. scratch: experiments, anything goes. Other words are allowed. Default: active.",
       "type": "string",
       "default": "active",
-      "anyOf": [{ "enum": ["active", "maintained", "scratch"] }, { "pattern": "^\\S+$" }]
+      "anyOf": [
+        {
+          "enum": [
+            "active",
+            "maintained",
+            "scratch"
+          ]
+        },
+        {
+          "pattern": "^\\S+$"
+        }
+      ]
+    },
+    "owner": {
+      "description": "Who answers for it: a forge handle, @user or @org/team.",
+      "type": "string",
+      "pattern": "^@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9._-]+)?$"
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Where the runs entries run unless they say otherwise, e.g. cloudflare. Tools may assume one when it is left out."
     },
     "components": {
       "description": "The parts of the repo, each with the paths it owns.",
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "owns"],
+        "required": [
+          "name",
+          "owns"
+        ],
         "additionalProperties": false,
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
           "owns": {
             "description": "Paths or globs, relative to the repo root (e.g. src/web/, packages/db/**).",
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "rules": { "description": "A repo-relative file with the rules for working in this component.", "type": "string" }
+          "rules": {
+            "description": "A repo-relative file with the rules for working in this component.",
+            "type": "string"
+          },
+          "owner": {
+            "description": "Who answers for this component, when not the repo’s owner: @user or @org/team.",
+            "type": "string",
+            "pattern": "^@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:/[A-Za-z0-9._-]+)?$"
+          }
         }
       }
     },
     "docs": {
       "description": "What to read first: label → repo-relative path (e.g. architecture: ARCHITECTURE.md).",
       "type": "object",
-      "additionalProperties": { "type": "string", "minLength": 1 }
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "health": {
-      "description": "What a dashboard should watch for this repo.",
+      "description": "What a dashboard should watch beyond runs. health.workers is read as production workers too; new files should name them under runs.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "workers": { "description": "Names of deployed services (e.g. Cloudflare Workers).", "type": "array", "items": { "type": "string" } },
-        "links": { "description": "URLs that should answer.", "type": "array", "items": { "type": "string", "pattern": "^https?://" } }
+        "workers": {
+          "description": "Names of deployed services (e.g. Cloudflare Workers).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "links": {
+          "description": "URLs that should answer.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^https?://"
+          }
+        }
+      }
+    },
+    "runs": {
+      "$ref": "#/definitions/runs",
+      "description": "What the repo deploys, in production."
+    },
+    "uses": {
+      "description": "What the repo depends on: another repo’s peak (owner/name) or an outside service (a word).",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "description": "A repo, owner/name.",
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+          },
+          {
+            "description": "An outside service, e.g. stripe.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          {
+            "type": "object",
+            "required": [
+              "repo"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "repo": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+              },
+              "what": {
+                "description": "Which of that repo’s runs entries, when not all of it.",
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "service"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "environments": {
+      "description": "Environments other than production, by name: only what differs. A kind named under runs replaces production’s list of that kind.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "not": {
+          "const": "production"
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "description": "Where it runs or is published.",
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://"
+          },
+          "runs": {
+            "$ref": "#/definitions/runs"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "runs": {
+      "description": "What is deployed, by kind. Each entry is a name, or a mapping with name and more.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workers": {
+          "description": "Deployed services (e.g. Cloudflare Workers).",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                "type": "string",
+                "pattern": "^[^*]+\\*?$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                    "type": "string",
+                    "pattern": "^[^*]+\\*?$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "description": "Where it runs, when not the file’s provider."
+                  },
+                  "component": {
+                    "description": "The component it belongs to (a components name).",
+                    "type": "string"
+                  },
+                  "hosts": {
+                    "description": "For a worker that only serves static files: the hostnames it serves.",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9.-]+\\.[A-Za-z0-9-]+$"
+                    }
+                  },
+                  "objects": {
+                    "description": "The Durable Object classes this worker holds.",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_$][\\w$]*$"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "databases": {
+          "description": "Databases (e.g. D1).",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                "type": "string",
+                "pattern": "^[^*]+\\*?$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                    "type": "string",
+                    "pattern": "^[^*]+\\*?$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "description": "Where it runs, when not the file’s provider."
+                  },
+                  "component": {
+                    "description": "The component it belongs to (a components name).",
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "stores": {
+          "description": "Key-value stores (e.g. KV namespaces).",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                "type": "string",
+                "pattern": "^[^*]+\\*?$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                    "type": "string",
+                    "pattern": "^[^*]+\\*?$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "description": "Where it runs, when not the file’s provider."
+                  },
+                  "component": {
+                    "description": "The component it belongs to (a components name).",
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "buckets": {
+          "description": "Object storage buckets (e.g. R2).",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                "type": "string",
+                "pattern": "^[^*]+\\*?$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                    "type": "string",
+                    "pattern": "^[^*]+\\*?$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "description": "Where it runs, when not the file’s provider."
+                  },
+                  "component": {
+                    "description": "The component it belongs to (a components name).",
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "queues": {
+          "description": "Message queues.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                "type": "string",
+                "pattern": "^[^*]+\\*?$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "The name its provider knows it by. Ending in * it is a pattern: every one with that prefix not named before it in the list.",
+                    "type": "string",
+                    "pattern": "^[^*]+\\*?$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$",
+                    "description": "Where it runs, when not the file’s provider."
+                  },
+                  "component": {
+                    "description": "The component it belongs to (a components name).",
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
       }
     }
   }
