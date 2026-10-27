@@ -84,7 +84,7 @@ test("catalog: owner, provider, runs, uses and environments", () => {
   assert.equal(p.provider, "cloudflare");
   assert.equal(p.components[1]!.owner, "@skribb/cms");
   assert.deepEqual(p.runs?.workers, [
-    { name: "skribb-web", component: "web" },
+    { name: "skribb-web", component: "web", objects: ["Hub"] },
     { name: "skribb-assets", hosts: ["skribb.example", "www.skribb.example"] },
     { name: "skribb-cms-*" },
     { name: "skribb-*" },
@@ -130,6 +130,8 @@ test("problems in the catalog fields", () => {
   assert.match(p({ runs: { workers: [{ name: "a", component: "web" }] } }), /component "web" is not one of components/);
   assert.match(p({ runs: { workers: [{ name: "a", hosts: [] }] } }), /hosts must be a non-empty list/);
   assert.match(p({ runs: { workers: [{ name: "a", hosts: ["https://a.b"] }] } }), /is not a hostname/);
+  assert.match(p({ runs: { workers: [{ name: "a", objects: ["my-hub"] }] } }), /is not a class name/);
+  assert.match(p({ runs: { workers: [{ name: "a", objects: "Hub" }] } }), /objects must be a non-empty list/);
   assert.match(p({ uses: "stripe" }), /uses must be a list/);
   assert.match(p({ uses: ["Stripe Inc"] }), /lowercase word for a service/);
   assert.match(p({ uses: ["a/b/c"] }), /is not a repo/);
@@ -142,12 +144,13 @@ test("problems in the catalog fields", () => {
 });
 
 test("warnings in the catalog fields: unknown kinds and keys, hosts off a worker", () => {
-  const r = parsePeak({ name: "x", runs: { functions: ["a"], databases: [{ name: "d", hosts: ["a.b"], size: 1 }] }, uses: [{ service: "s", url: "u" }], environments: { staging: { branch: "dev" } } });
+  const r = parsePeak({ name: "x", runs: { functions: ["a"], databases: [{ name: "d", hosts: ["a.b"], objects: ["X"], size: 1 }] }, uses: [{ service: "s", url: "u" }], environments: { staging: { branch: "dev" } } });
   assert.ok("peak" in r);
   assert.deepEqual(r.warnings, [
     'runs: unknown kind "functions" (ignored; known: workers, databases, stores, buckets, queues).',
     'runs.databases[0]: unknown key "size" (ignored).',
     "runs.databases[0]: hosts is for workers only (ignored).",
+    "runs.databases[0]: objects is for workers only (ignored).",
     'uses[0]: unknown key "url" (ignored).',
     'environments.staging: unknown key "branch" (ignored).',
   ]);

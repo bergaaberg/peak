@@ -253,6 +253,15 @@
                       "type": "string",
                       "pattern": "^[A-Za-z0-9.-]+\\.[A-Za-z0-9-]+$"
                     }
+                  },
+                  "objects": {
+                    "description": "The Durable Object classes this worker holds.",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_$][\\w$]*$"
+                    }
                   }
                 }
               }

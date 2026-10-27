@@ -51,6 +51,8 @@ export type Resource = {
   component?: string;
   /** Workers only: the hostnames a static-files-only worker serves, so its traffic can be found. */
   hosts?: string[];
+  /** Workers only: the Durable Object classes it holds (they live inside the worker). */
+  objects?: string[];
 };
 
 /** What the repo deploys, by kind. Only kinds the file names are present. */
@@ -102,7 +104,7 @@ const KEYS = new Set(["$schema", "version", "name", "description", "url", "tier"
 const OWNER = /^@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?$/;
 const REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 const WORD = /^[a-z][a-z0-9-]*$/;
-const RESOURCE_KEYS = ["name", "provider", "component", "hosts"];
+const RESOURCE_KEYS = ["name", "provider", "component", "hosts", "objects"];
 
 const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -309,7 +311,22 @@ function parseResource(e: unknown, kind: Kind, at: string, named: Set<string>, p
       else for (const h of hosts) if (!/^[a-z0-9.-]+$/i.test(h) || !h.includes(".")) problems.push(`${at}: "${h}" is not a hostname.`);
     }
   }
-  return { name: name.trim(), ...(provider ? { provider } : {}), ...(component ? { component } : {}), ...(hosts?.length ? { hosts } : {}) };
+  let objects: string[] | undefined;
+  if (e.objects !== undefined) {
+    if (kind !== "workers") warnings.push(`${at}: objects is for workers only (ignored).`);
+    else {
+      objects = strList(e.objects) ?? undefined;
+      if (!objects?.length) problems.push(`${at}: objects must be a non-empty list of class names.`);
+      else for (const o of objects) if (!/^[A-Za-z_$][\w$]*$/.test(o)) problems.push(`${at}: "${o}" is not a class name.`);
+    }
+  }
+  return {
+    name: name.trim(),
+    ...(provider ? { provider } : {}),
+    ...(component ? { component } : {}),
+    ...(hosts?.length ? { hosts } : {}),
+    ...(objects?.length ? { objects } : {}),
+  };
 }
 
 function resourceName(n: string, at: string, problems: string[]): boolean {

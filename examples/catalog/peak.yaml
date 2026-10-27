@@ -17,6 +17,7 @@ runs:
   workers:
     - name: skribb-web
       component: web
+      objects: [Hub]
     - name: skribb-assets
       hosts: [skribb.example, www.skribb.example]
     - skribb-cms-*

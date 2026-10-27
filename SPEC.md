@@ -65,6 +65,8 @@ Each entry is a name, or a mapping with `name` and any of:
 - `component`: the component it belongs to (one of `components`), tying code to what runs it.
 - `hosts` (workers only): for a worker that only serves static files and so never runs code of
   its own, the hostnames it serves. A dashboard counts their traffic as its.
+- `objects` (workers only): the Durable Object classes it holds. They live inside the worker, so
+  they're named on it rather than as a kind of their own.
 
 A name ending in `*` is a pattern: it stands for every one with that prefix **not named before
 it in the same list**. Order matters, so name the specific ones first:
@@ -133,7 +135,7 @@ a word treat it like `active`.
 A file that breaks a rule above has **problems**, and a tool should not use it (Dovre lists it on
 /topo with the problems; `peak check` fails). Every problem is reported, not just the first.
 
-Unknown keys, unknown `runs` kinds, `hosts` on anything but a worker, and `docs` entries that
+Unknown keys, unknown `runs` kinds, `hosts` or `objects` on anything but a worker, and `docs` entries that
 aren't paths, are **warnings**: the file is still used and
 the extra keys are ignored. That leaves room for tools to experiment, but a key that matters
 should come here first.

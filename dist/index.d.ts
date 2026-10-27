@@ -41,6 +41,8 @@ export type Resource = {
     component?: string;
     /** Workers only: the hostnames a static-files-only worker serves, so its traffic can be found. */
     hosts?: string[];
+    /** Workers only: the Durable Object classes it holds (they live inside the worker). */
+    objects?: string[];
 };
 /** What the repo deploys, by kind. Only kinds the file names are present. */
 export type Runs = Partial<Record<Kind, Resource[]>>;

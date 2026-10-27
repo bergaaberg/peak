@@ -22,7 +22,7 @@ const KEYS = new Set(["$schema", "version", "name", "description", "url", "tier"
 const OWNER = /^@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?$/;
 const REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 const WORD = /^[a-z][a-z0-9-]*$/;
-const RESOURCE_KEYS = ["name", "provider", "component", "hosts"];
+const RESOURCE_KEYS = ["name", "provider", "component", "hosts", "objects"];
 const isMap = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 const strList = (v) => Array.isArray(v) && v.every((x) => typeof x === "string") ? v.map((x) => x.trim()).filter(Boolean) : null;
@@ -263,7 +263,27 @@ function parseResource(e, kind, at, named, problems, warnings) {
                         problems.push(`${at}: "${h}" is not a hostname.`);
         }
     }
-    return { name: name.trim(), ...(provider ? { provider } : {}), ...(component ? { component } : {}), ...(hosts?.length ? { hosts } : {}) };
+    let objects;
+    if (e.objects !== undefined) {
+        if (kind !== "workers")
+            warnings.push(`${at}: objects is for workers only (ignored).`);
+        else {
+            objects = strList(e.objects) ?? undefined;
+            if (!objects?.length)
+                problems.push(`${at}: objects must be a non-empty list of class names.`);
+            else
+                for (const o of objects)
+                    if (!/^[A-Za-z_$][\w$]*$/.test(o))
+                        problems.push(`${at}: "${o}" is not a class name.`);
+        }
+    }
+    return {
+        name: name.trim(),
+        ...(provider ? { provider } : {}),
+        ...(component ? { component } : {}),
+        ...(hosts?.length ? { hosts } : {}),
+        ...(objects?.length ? { objects } : {}),
+    };
 }
 function resourceName(n, at, problems) {
     const s = n.trim();

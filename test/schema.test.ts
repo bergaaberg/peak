@@ -17,6 +17,6 @@ test("the schema names the same keys the parser reads", () => {
   assert.deepEqual(Object.keys(schema.properties.components.items.properties).sort(), ["name", "owner", "owns", "rules"]);
   assert.deepEqual(Object.keys(schema.properties.health.properties).sort(), ["links", "workers"]);
   assert.deepEqual(Object.keys(schema.definitions.runs.properties), [...KINDS]);
-  assert.deepEqual(Object.keys(schema.definitions.runs.properties.workers.items.anyOf[1].properties).sort(), ["component", "hosts", "name", "provider"]);
+  assert.deepEqual(Object.keys(schema.definitions.runs.properties.workers.items.anyOf[1].properties).sort(), ["component", "hosts", "name", "objects", "provider"]);
   assert.deepEqual(schema.required, ["name"]);
 });
