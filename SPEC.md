@@ -55,7 +55,7 @@ a word treat it like `active`.
 ## Problems and warnings
 
 A file that breaks a rule above has **problems**, and a tool should not use it (Dovre lists it on
-/atlas with the problems; `peak check` fails). Every problem is reported, not just the first.
+/topo with the problems; `peak check` fails). Every problem is reported, not just the first.
 
 Unknown keys, and `docs` entries that aren't paths, are **warnings**: the file is still used and
 the extra keys are ignored. That leaves room for tools to experiment, but a key that matters
@@ -120,7 +120,7 @@ More in [examples/](examples/).
 
 ## Tools that read it
 
-- [Dovre](https://github.com/bergaaberg/dovre): its Repo Atlas (/atlas) lists every checkout's
+- [Dovre](https://github.com/bergaaberg/dovre): its Topo (/topo) lists every checkout's
   peak, Bino (the assistant) gets each repo's tier, components and docs as context, `/agents/new`
   offers "focus on this component" with its paths and rules, and pull requests show the repo's
   tier and docs.

@@ -24,7 +24,7 @@ docs:
 - **`@bergaaberg/peak`**: the parser (no dependencies, runs in Node, Workers and browsers) and
   the `peak check` command.
 
-Read by [Dovre](https://github.com/bergaaberg/dovre)'s Repo Atlas, where the format started as
+Read by [Dovre](https://github.com/bergaaberg/dovre)'s Topo (once called Atlas), where the format started as
 `range.yaml`.
 
 ## Check a repo
