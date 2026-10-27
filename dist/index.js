@@ -16,7 +16,13 @@ export const FILES = ["peak.yaml", "peak.yml"];
 export const LEGACY_FILES = ["range.yaml", "range.yml"];
 /** The tiers the spec names. Any other word is allowed and kept as written. */
 export const TIERS = ["active", "maintained", "scratch"];
-const KEYS = new Set(["$schema", "version", "name", "description", "url", "tier", "components", "docs", "health"]);
+/** The kinds of deployed things `runs` can name, in the order the spec lists them. */
+export const KINDS = ["workers", "databases", "stores", "buckets", "queues"];
+const KEYS = new Set(["$schema", "version", "name", "description", "url", "tier", "owner", "provider", "components", "docs", "health", "runs", "uses", "environments"]);
+const OWNER = /^@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9._-]+)?$/;
+const REPO = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+const WORD = /^[a-z][a-z0-9-]*$/;
+const RESOURCE_KEYS = ["name", "provider", "component", "hosts"];
 const isMap = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 const strList = (v) => Array.isArray(v) && v.every((x) => typeof x === "string") ? v.map((x) => x.trim()).filter(Boolean) : null;
@@ -55,6 +61,8 @@ export function parsePeak(raw) {
     if (raw.tier !== undefined && typeof raw.tier !== "string")
         problems.push("tier must be a word, e.g. active, maintained or scratch.");
     const tier = str(raw.tier) || "active";
+    const repoOwner = owner(raw.owner, "owner", problems);
+    const provider = word(raw.provider, "provider", problems);
     const components = [];
     if (raw.components !== undefined && raw.components !== null) {
         if (!Array.isArray(raw.components))
@@ -72,10 +80,11 @@ export function parsePeak(raw) {
                     problems.push(`${at}${cname ? ` (${cname})` : ""}: owns must be a non-empty list of paths.`);
                 if (c.rules !== undefined && typeof c.rules !== "string")
                     problems.push(`${at}: rules must be a path.`);
+                const cowner = owner(c.owner, `${at}: owner`, problems);
                 for (const k of Object.keys(c))
-                    if (!["name", "owns", "rules"].includes(k))
+                    if (!["name", "owns", "rules", "owner"].includes(k))
                         warnings.push(`${at}: unknown key "${k}" (ignored).`);
-                components.push({ name: cname, owns: owns ?? [], ...(str(c.rules) ? { rules: str(c.rules) } : {}) });
+                components.push({ name: cname, owns: owns ?? [], ...(str(c.rules) ? { rules: str(c.rules) } : {}), ...(cowner ? { owner: cowner } : {}) });
             });
     }
     const docs = {};
@@ -107,10 +116,192 @@ export function parsePeak(raw) {
             health = { ...(workers ? { workers } : {}), ...(links ? { links } : {}) };
         }
     }
+    const named = new Set(components.map((c) => c.name));
+    const runs = raw.runs === undefined || raw.runs === null ? undefined : parseRuns(raw.runs, "runs", named, problems, warnings);
+    const uses = [];
+    if (raw.uses !== undefined && raw.uses !== null) {
+        if (!Array.isArray(raw.uses))
+            problems.push("uses must be a list.");
+        else
+            raw.uses.forEach((u, i) => {
+                const use = parseUse(u, `uses[${i}]`, problems, warnings);
+                if (use)
+                    uses.push(use);
+            });
+    }
+    const environments = {};
+    if (raw.environments !== undefined && raw.environments !== null) {
+        if (!isMap(raw.environments))
+            problems.push("environments must be a mapping of name: what differs.");
+        else
+            for (const [env, e] of Object.entries(raw.environments)) {
+                const at = `environments.${env}`;
+                if (!WORD.test(env))
+                    problems.push(`${at}: the name must be a lowercase word (staging, preview, …).`);
+                if (env === "production")
+                    problems.push(`${at}: production is the file itself; name only the others.`);
+                if (!isMap(e)) {
+                    problems.push(`${at} must be a mapping with url and/or runs.`);
+                    continue;
+                }
+                for (const k of Object.keys(e))
+                    if (k !== "url" && k !== "runs")
+                        warnings.push(`${at}: unknown key "${k}" (ignored).`);
+                const eurl = str(e.url) || undefined;
+                if (e.url !== undefined && (!eurl || !webUrl(eurl)))
+                    problems.push(`${at}.url must be an http(s) URL.`);
+                const eruns = e.runs === undefined || e.runs === null ? undefined : parseRuns(e.runs, `${at}.runs`, named, problems, warnings);
+                environments[env] = { ...(eurl ? { url: eurl } : {}), ...(eruns ? { runs: eruns } : {}) };
+            }
+    }
     if (problems.length)
         return { problems, warnings };
     return {
-        peak: { version, name, ...(description ? { description } : {}), ...(url ? { url } : {}), tier, components, docs, ...(health ? { health } : {}) },
+        peak: {
+            version,
+            name,
+            ...(description ? { description } : {}),
+            ...(url ? { url } : {}),
+            tier,
+            ...(repoOwner ? { owner: repoOwner } : {}),
+            ...(provider ? { provider } : {}),
+            components,
+            docs,
+            ...(health ? { health } : {}),
+            ...(runs ? { runs } : {}),
+            uses,
+            environments,
+        },
         warnings,
     };
+}
+/**
+ * What one environment runs (production when `env` is left out): its own entries for each kind
+ * it names, production's for the rest. `health.workers` counts as production workers, after
+ * `runs.workers` and without repeats. Every entry carries its provider, from the file when it
+ * doesn't name one.
+ */
+export function runsIn(peak, env) {
+    const base = { ...peak.runs };
+    const extra = (peak.health?.workers ?? []).filter((w) => !base.workers?.some((r) => r.name === w));
+    if (extra.length)
+        base.workers = [...(base.workers ?? []), ...extra.map((name) => ({ name }))];
+    const over = env && env !== "production" ? peak.environments[env]?.runs : undefined;
+    const out = {};
+    for (const k of KINDS) {
+        const list = over?.[k] ?? base[k];
+        if (list)
+            out[k] = list.map((r) => (r.provider || !peak.provider ? r : { ...r, provider: peak.provider }));
+    }
+    return out;
+}
+function owner(v, at, problems) {
+    if (v === undefined || v === null)
+        return undefined;
+    const s = str(v);
+    if (!OWNER.test(s))
+        problems.push(`${at} must be a forge handle: @user or @org/team.`);
+    return s || undefined;
+}
+function word(v, at, problems) {
+    if (v === undefined || v === null)
+        return undefined;
+    const s = str(v);
+    if (!WORD.test(s))
+        problems.push(`${at} must be a lowercase word, e.g. cloudflare.`);
+    return s || undefined;
+}
+function parseRuns(v, at, named, problems, warnings) {
+    if (!isMap(v))
+        return void problems.push(`${at} must be a mapping of kind: list (${KINDS.join(", ")}).`);
+    const runs = {};
+    for (const [k, list] of Object.entries(v)) {
+        if (!KINDS.includes(k)) {
+            warnings.push(`${at}: unknown kind "${k}" (ignored; known: ${KINDS.join(", ")}).`);
+            continue;
+        }
+        if (!Array.isArray(list)) {
+            problems.push(`${at}.${k} must be a list of names.`);
+            continue;
+        }
+        const out = [];
+        list.forEach((e, i) => {
+            const r = parseResource(e, k, `${at}.${k}[${i}]`, named, problems, warnings);
+            if (r)
+                out.push(r);
+        });
+        runs[k] = out;
+    }
+    return runs;
+}
+function parseResource(e, kind, at, named, problems, warnings) {
+    if (typeof e === "string")
+        return resourceName(e, at, problems) ? { name: e.trim() } : undefined;
+    if (!isMap(e))
+        return void problems.push(`${at} must be a name or a mapping with name.`);
+    for (const k of Object.keys(e))
+        if (!RESOURCE_KEYS.includes(k))
+            warnings.push(`${at}: unknown key "${k}" (ignored).`);
+    const name = typeof e.name === "string" ? e.name : "";
+    if (!resourceName(name, at, problems))
+        return undefined;
+    const provider = word(e.provider, `${at}: provider`, problems);
+    const component = e.component === undefined ? undefined : str(e.component);
+    if (component !== undefined && !named.has(component))
+        problems.push(`${at}: component "${component}" is not one of components.`);
+    let hosts;
+    if (e.hosts !== undefined) {
+        if (kind !== "workers")
+            warnings.push(`${at}: hosts is for workers only (ignored).`);
+        else {
+            hosts = strList(e.hosts) ?? undefined;
+            if (!hosts?.length)
+                problems.push(`${at}: hosts must be a non-empty list of hostnames.`);
+            else
+                for (const h of hosts)
+                    if (!/^[a-z0-9.-]+$/i.test(h) || !h.includes("."))
+                        problems.push(`${at}: "${h}" is not a hostname.`);
+        }
+    }
+    return { name: name.trim(), ...(provider ? { provider } : {}), ...(component ? { component } : {}), ...(hosts?.length ? { hosts } : {}) };
+}
+function resourceName(n, at, problems) {
+    const s = n.trim();
+    if (!s)
+        return void problems.push(`${at}: name is required.`), false;
+    if (s.slice(0, -1).includes("*") || s === "*")
+        return void problems.push(`${at}: "${s}": a * may only end a name, after a prefix.`), false;
+    return true;
+}
+function parseUse(u, at, problems, warnings) {
+    if (typeof u === "string") {
+        const s = u.trim();
+        if (!s)
+            return void problems.push(`${at} is empty.`);
+        if (s.includes("/"))
+            return REPO.test(s) ? { repo: s } : void problems.push(`${at}: "${s}" is not a repo (owner/name).`);
+        return WORD.test(s) ? { service: s } : void problems.push(`${at}: "${s}" must be owner/name for a repo or a lowercase word for a service.`);
+    }
+    if (!isMap(u))
+        return void problems.push(`${at} must be owner/name, a service word, or a mapping with repo or service.`);
+    const why = str(u.why) || undefined;
+    if ((u.repo === undefined) === (u.service === undefined))
+        return void problems.push(`${at} needs exactly one of repo and service.`);
+    if (u.repo !== undefined) {
+        for (const k of Object.keys(u))
+            if (!["repo", "what", "why"].includes(k))
+                warnings.push(`${at}: unknown key "${k}" (ignored).`);
+        const repo = str(u.repo);
+        if (!REPO.test(repo))
+            return void problems.push(`${at}: repo must be owner/name.`);
+        const what = str(u.what) || undefined;
+        return { repo, ...(what ? { what } : {}), ...(why ? { why } : {}) };
+    }
+    for (const k of Object.keys(u))
+        if (!["service", "why"].includes(k))
+            warnings.push(`${at}: unknown key "${k}" (ignored).`);
+    const service = str(u.service);
+    if (!WORD.test(service))
+        return void problems.push(`${at}: service must be a lowercase word (stripe, resend, …).`);
+    return { service, ...(why ? { why } : {}) };
 }

@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json
+# A repo as a catalog entry: what it deploys, what it depends on, who answers for it.
+version: 1
+name: Skribb
+description: Websites and paid newsletters for creators.
+url: https://skribb.example
+tier: active
+owner: "@skribb/core"
+provider: cloudflare
+components:
+  - name: web
+    owns: [apps/web/]
+  - name: cms
+    owns: [services/cms/]
+    owner: "@skribb/cms"
+runs:
+  workers:
+    - name: skribb-web
+      component: web
+    - name: skribb-assets
+      hosts: [skribb.example, www.skribb.example]
+    - skribb-cms-*
+    - skribb-*
+  databases: [skribb, skribb-cms-*]
+  buckets: [skribb-media]
+  queues: [skribb-mail]
+uses:
+  - northwind/billing
+  - repo: northwind/identity
+    what: identity-api
+    why: sign-in
+  - service: stripe
+    why: payments
+  - resend
+environments:
+  staging:
+    url: https://staging.skribb.example
+    runs:
+      workers: [skribb-web-staging]
+      databases: [skribb-staging]
