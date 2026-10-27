@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json
+# A scratch repo: tell agents (and future you) that anything goes here.
+name: spikes
+description: Throwaway experiments. Nothing here ships.
+tier: scratch

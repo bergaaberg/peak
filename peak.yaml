@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json
+version: 1
+name: peak
+description: The peak.yaml format, its JSON Schema, parser and checker.
+tier: active
+components:
+  - name: format
+    owns: [SPEC.md, peak.schema.json, examples/]
+  - name: parser
+    owns: [src/index.ts, test/parse.test.ts, test/schema.test.ts]
+  - name: cli
+    owns: [src/cli.ts, action.yml, test/cli.test.ts]
+docs:
+  spec: SPEC.md
+  readme: README.md
+  rules: CLAUDE.md

@@ -1,0 +1,39 @@
+{
+  "name": "@bergaaberg/peak",
+  "version": "0.1.0",
+  "description": "peak.yaml: one small file per repo that tells people and coding agents what the repo is, what owns what, and what to read first.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bergaaberg/peak.git"
+  },
+  "keywords": ["peak.yaml", "repo-manifest", "coding-agents", "json-schema", "catalog"],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "peak": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./peak.schema.json": "./peak.schema.json"
+  },
+  "files": ["dist", "peak.schema.json", "SPEC.md"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli.js",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "check": "pnpm typecheck && pnpm test && pnpm build && git diff --exit-code -- dist && test -z \"$(git ls-files --others --exclude-standard -- dist)\""
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json
+# A monorepo: each component owns its paths and may bring its own rules.
+version: 1
+name: Northwind
+description: The shop, its checkout and the catalog service.
+url: https://northwind.example
+tier: active
+components:
+  - name: web
+    owns: [apps/web/, packages/ui/]
+    rules: apps/web/AGENTS.md
+  - name: checkout
+    owns: [services/checkout/**]
+    rules: services/checkout/RULES.md
+  - name: db
+    owns: [packages/db/, migrations/]
+docs:
+  architecture: ARCHITECTURE.md
+  plan: docs/PLAN.md
+health:
+  workers: [northwind-web, northwind-checkout]
+  links: [https://northwind.example, https://api.northwind.example/health]

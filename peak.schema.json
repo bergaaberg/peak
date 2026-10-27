@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json",
+  "title": "peak.yaml",
+  "description": "What a repo is, what owns what, and what to read first, for people and coding agents. Spec: https://github.com/bergaaberg/peak/blob/main/SPEC.md",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "description": "The format version. Leave it out or write 1.", "const": 1 },
+    "name": { "description": "The project's name, as people say it.", "type": "string", "minLength": 1 },
+    "description": { "description": "One sentence on what it is.", "type": "string" },
+    "url": { "description": "Where it runs or is published.", "type": "string", "format": "uri", "pattern": "^https?://" },
+    "tier": {
+      "description": "How much care the repo gets. active: worked on now, changes go through review and CI. maintained: kept working, changes are small and careful. scratch: experiments, anything goes. Other words are allowed. Default: active.",
+      "type": "string",
+      "default": "active",
+      "anyOf": [{ "enum": ["active", "maintained", "scratch"] }, { "pattern": "^\\S+$" }]
+    },
+    "components": {
+      "description": "The parts of the repo, each with the paths it owns.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "owns"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "owns": {
+            "description": "Paths or globs, relative to the repo root (e.g. src/web/, packages/db/**).",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "rules": { "description": "A repo-relative file with the rules for working in this component.", "type": "string" }
+        }
+      }
+    },
+    "docs": {
+      "description": "What to read first: label → repo-relative path (e.g. architecture: ARCHITECTURE.md).",
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "health": {
+      "description": "What a dashboard should watch for this repo.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workers": { "description": "Names of deployed services (e.g. Cloudflare Workers).", "type": "array", "items": { "type": "string" } },
+        "links": { "description": "URLs that should answer.", "type": "array", "items": { "type": "string", "pattern": "^https?://" } }
+      }
+    }
+  }
+}

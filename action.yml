@@ -1,0 +1,19 @@
+name: peak check
+description: Validate the repo's peak.yaml (format, docs and rules files).
+branding:
+  icon: check-circle
+  color: blue
+inputs:
+  path:
+    description: Folders or files to check, separated by spaces.
+    default: "."
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - shell: bash
+      run: npm install --omit=dev --no-audit --no-fund --prefix "$GITHUB_ACTION_PATH" >/dev/null
+    - shell: bash
+      run: node "$GITHUB_ACTION_PATH/dist/cli.js" check ${{ inputs.path }}

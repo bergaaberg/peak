@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bergaaberg/peak/main/peak.schema.json
+# A single app: no components, just what it is and what to read.
+version: 1
+name: Quill
+description: A newsletter platform for writers.
+url: https://quill.example
+tier: active
+docs:
+  readme: README.md
+  rules: AGENTS.md
+health:
+  links: [https://quill.example/healthz]
